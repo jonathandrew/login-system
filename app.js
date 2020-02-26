@@ -4,9 +4,14 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const mongoose = require('mongoose');
+const passport = require('passport');
+const session = require('express-session');
+// MongoStore must be below session
+let MongoStore = require('connect-mongo')(session);
+require('./lib/passport');
 require('dotenv').config();
 
-const indexRouter = require('./routes/index');
+const indexRouter = require('./routes/indexRouter');
 const usersRouter = require('./routes/users/userRoutes');
 
 const app = express();
@@ -30,6 +35,32 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+//create session middleware
+app.use(
+  session({
+    resave: true,
+    saveUninitialized: true,
+    //required
+    secret: process.env.SESSION_SECRET,
+    //store info in database
+    store: new MongoStore({
+      // url: process.env.MONGODB_URI,
+      mongooseConnection: mongoose.connection,
+      autoReconnect: true
+    }),
+    cookie: {
+      secure: false,
+      maxAge: 60000
+    }
+  })
+);
+
+// initialize passport module
+app.use(passport.initialize());
+
+// create session THIS MUST BE BELOW SESSION MIDDLEWARE
+app.use(passport.session());
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
